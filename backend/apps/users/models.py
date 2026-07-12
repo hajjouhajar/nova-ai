@@ -19,9 +19,9 @@ class LearningProfile(models.Model):
         ('advanced', 'Advanced'),
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='learning_profile')
-    objective = models.CharField(max_length=255)
-    level = models.CharField(max_length=30, choices=LEVEL_CHOICES)
-    weekly_hours = models.CharField(max_length=20)  # ex: "4-7"
-    language = models.CharField(max_length=20, default='French')
-    career_goal = models.CharField(max_length=255, blank=True)
+    domain = models.CharField(max_length=255)
+    niveau = models.CharField(max_length=30)
+    disponibilite = models.CharField(max_length=20)
+    langue = models.CharField(max_length=20, default='French')
+    career = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

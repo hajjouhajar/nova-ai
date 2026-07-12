@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { login, register } from "./api/auth";
+import { saveLearningProfile } from "./api/learning";
 import {
   LayoutDashboard, FolderOpen, CheckSquare, MessageSquare,
   Clock, Settings, Bell, Plus, Send, X, CheckCircle2, Circle,
@@ -2530,19 +2531,24 @@ useEffect(() => {
   }
 
   if (needsOnboarding) {
-    return (
-      <Onboarding
-        firstName={firstName}
-        onComplete={p => {
-          const newPath: LearningPath = { id: Date.now(), profile: p, steps: MOCK_ROADMAP, modules: MOCK_MODULES };
-          setLearningPaths([newPath]);
-          setActivePathId(newPath.id);
-          setNeedsOnboarding(false);
-          setPage("roadmap");
-        }}
-      />
-    );
-  }
+  return (
+    <Onboarding
+      firstName={firstName}
+      onComplete={async p => {
+        try {
+          await saveLearningProfile(p);
+        } catch (err) {
+          console.error("Erreur sauvegarde du profil d'apprentissage", err);
+        }
+        const newPath: LearningPath = { id: Date.now(), profile: p, steps: MOCK_ROADMAP, modules: MOCK_MODULES };
+        setLearningPaths([newPath]);
+        setActivePathId(newPath.id);
+        setNeedsOnboarding(false);
+        setPage("roadmap");
+      }}
+    />
+  );
+}
 
   const handleAddPath = (p: LearningProfile) => {
     const newPath: LearningPath = { id: Date.now(), profile: p, steps: MOCK_ROADMAP, modules: MOCK_MODULES };

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { login, register } from "./api/auth";
+import { saveLearningProfile, generateRoadmap } from "./api/learning";
 import {
   LayoutDashboard, FolderOpen, CheckSquare, MessageSquare,
   Clock, Settings, Bell, Plus, Send, X, CheckCircle2, Circle,
@@ -1059,7 +1060,7 @@ function Tasks({ tasks, setTasks }: { tasks: Task[]; setTasks: (t: Task[]) => vo
                     <span className="text-xs font-semibold text-foreground">{col.label}</span>
                     <span className="text-xs text-muted-foreground">({colTasks.length})</span>
                   </div>
-                  <button onClick={() => { setAddingCol(col.id); setNewTitle(""); }} className="text-muted-foreground hover:text-primary transition-colors p-0.5 rounded">
+                 <button onClick={() => setShowNewTask(col.id)} className="text-muted-foreground hover:text-primary transition-colors p-0.5 rounded">
                     <Plus size={14} />
                   </button>
                 </div>
@@ -1542,9 +1543,11 @@ function Roadmap({
 
   const generate = () => {
     setLoading(true);
-    setTimeout(() => { setSteps(MOCK_ROADMAP); setLoading(false); setShowConfirm(false); }, 1800);
+    generateRoadmap()
+      .then((data) => { setSteps(data.steps); setLoading(false); setShowConfirm(false); })
+      .catch((err) => { console.error(err); setLoading(false); });
   };
-
+  
   const insertAfter = (idx: number) => {
     const ns: RoadmapStep = { ordre: idx + 2, titre: "Nouvelle étape", description: "Description à compléter.", duree_estimee_heures: 3, prerequis: [], status: "non_commencé" };
     const updated = [...steps.slice(0, idx + 1), ns, ...steps.slice(idx + 1)].map((s, i) => ({ ...s, ordre: i + 1 }));
@@ -2533,21 +2536,44 @@ useEffect(() => {
     return (
       <Onboarding
         firstName={firstName}
-        onComplete={p => {
-          const newPath: LearningPath = { id: Date.now(), profile: p, steps: MOCK_ROADMAP, modules: MOCK_MODULES };
-          setLearningPaths([newPath]);
-          setActivePathId(newPath.id);
-          setNeedsOnboarding(false);
-          setPage("roadmap");
+        onComplete={async (p) => {
+          try {
+            await saveLearningProfile(p);
+            const roadmapData = await generateRoadmap();
+            const newPath: LearningPath = {
+              id: Date.now(),
+              profile: p,
+              steps: roadmapData.steps,
+              modules: roadmapData.modules,
+            };
+            setLearningPaths([newPath]);
+            setActivePathId(newPath.id);
+          } catch (err) {
+            console.error("Erreur génération roadmap:", err);
+          } finally {
+            setNeedsOnboarding(false);
+            setPage("roadmap");
+          }
         }}
       />
     );
   }
 
-  const handleAddPath = (p: LearningProfile) => {
-    const newPath: LearningPath = { id: Date.now(), profile: p, steps: MOCK_ROADMAP, modules: MOCK_MODULES };
-    setLearningPaths(prev => [...prev, newPath]);
-    setActivePathId(newPath.id);
+  const handleAddPath = async (p: LearningProfile) => {
+    try {
+      await saveLearningProfile(p);
+      const roadmapData = await generateRoadmap();
+      const newPath: LearningPath = {
+        id: Date.now(),
+        profile: p,
+        steps: roadmapData.steps,
+        modules: roadmapData.modules,
+      };
+      setLearningPaths(prev => [...prev, newPath]);
+      setActivePathId(newPath.id);
+    } catch (err) {
+      console.error("Erreur génération roadmap:", err);
+    }
   };
 
   const handleCertificateEarned = (pathId: number, score: number) => {

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { login, register } from "./api/auth";
 import { saveLearningProfile, generateRoadmap } from "./api/learning";
+import { sendChatMessage } from "./api/chat";
 import {
   LayoutDashboard, FolderOpen, CheckSquare, MessageSquare,
   Clock, Settings, Bell, Plus, Send, X, CheckCircle2, Circle,
@@ -1196,17 +1197,23 @@ function Chat({ pinnedProject, onClearProject, tasks, setTasks, projects, setPro
   }, [pinnedProject?.id]);
 
   const send = () => {
-    if (!input.trim()) return;
-    const userMsg: ChatMessage = { id: Date.now(), role: "user", text: input, time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) };
-    setMessages(prev => [...prev, userMsg]);
-    setInput("");
-    setIsTyping(true);
-    setTimeout(() => {
-      const reply: ChatMessage = { id: Date.now() + 1, role: "assistant", text: AI_REPLIES[Math.floor(Math.random() * AI_REPLIES.length)], time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) };
+  if (!input.trim()) return;
+  const userMsg: ChatMessage = { id: Date.now(), role: "user", text: input, time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) };
+  setMessages(prev => [...prev, userMsg]);
+  const messageText = input;
+  setInput("");
+  setIsTyping(true);
+  sendChatMessage(messageText)
+    .then((data) => {
+      const reply: ChatMessage = { id: Date.now() + 1, role: "assistant", text: data.reponse, time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) };
       setMessages(prev => [...prev, reply]);
       setIsTyping(false);
-    }, 1400 + Math.random() * 600);
-  };
+    })
+    .catch((err) => {
+      console.error(err);
+      setIsTyping(false);
+    });
+};
 
   const handleFile = (file: File) => {
     const attachment: FileAttachment = { id: Date.now(), name: file.name, type: file.name.split(".").pop()?.toUpperCase() || "FILE", size: `${(file.size / 1024 / 1024).toFixed(1)} Mo`, progress: 0, status: "uploading" };

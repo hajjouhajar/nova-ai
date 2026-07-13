@@ -1,7 +1,11 @@
 const API_BASE_URL = "http://127.0.0.1:8000/api";
 
+const PUBLIC_ENDPOINTS = ["/auth/register/", "/auth/login/", "/auth/refresh/"];
+
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("access_token");
+  const isPublic = PUBLIC_ENDPOINTS.some(e => endpoint.startsWith(e));
+  const token = isPublic ? null : localStorage.getItem("access_token");
+
   const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {

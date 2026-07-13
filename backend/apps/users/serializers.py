@@ -23,4 +23,4 @@ class RegisterSerializer(serializers.ModelSerializer):
 class LearningProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearningProfile
-        fields = ['objective', 'level', 'weekly_hours', 'language', 'career_goal']
+        fields = ['domain', 'niveau', 'disponibilite', 'langue', 'career']

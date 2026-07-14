@@ -1,0 +1,3 @@
+﻿Ce document decrit le fonctionnement de Nova AI, un assistant pedagogique intelligent.
+Nova AI utilise un systeme de repetition espacee pour optimiser la memorisation des utilisateurs.
+Le systeme genere egalement des certificats verifiables via QR code une fois un parcours termine.

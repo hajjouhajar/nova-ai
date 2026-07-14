@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { login, register } from "./api/auth";
 import { saveLearningProfile, generateRoadmap,  getRoadmap } from "./api/learning";
 import { sendChatMessage } from "./api/chat";
+import { uploadDocument, analyzeDocument } from "./api/documents";
 
 import {
   LayoutDashboard, FolderOpen, CheckSquare, MessageSquare,
@@ -34,6 +35,7 @@ interface FileAttachment {
   size: string;
   progress: number;
   status: "uploading" | "processing" | "traité";
+  documentId?: number;
 }
 
 interface ChatMessage {
@@ -1204,7 +1206,13 @@ function Chat({ pinnedProject, onClearProject, tasks, setTasks, projects, setPro
   const messageText = input;
   setInput("");
   setIsTyping(true);
-  sendChatMessage(messageText)
+
+  const activeDoc = pinnedFiles.find(f => f.documentId);
+  const call = activeDoc
+    ? analyzeDocument(activeDoc.documentId!, messageText)
+    : sendChatMessage(messageText);
+
+  call
     .then((data) => {
       const reply: ChatMessage = { id: Date.now() + 1, role: "assistant", text: data.reponse, time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) };
       setMessages(prev => [...prev, reply]);
@@ -1216,25 +1224,25 @@ function Chat({ pinnedProject, onClearProject, tasks, setTasks, projects, setPro
     });
 };
 
-  const handleFile = (file: File) => {
-    const attachment: FileAttachment = { id: Date.now(), name: file.name, type: file.name.split(".").pop()?.toUpperCase() || "FILE", size: `${(file.size / 1024 / 1024).toFixed(1)} Mo`, progress: 0, status: "uploading" };
-    const fileMsg: ChatMessage = { id: Date.now() + 1, role: "file", text: "", time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }), file: attachment };
-    setMessages(prev => [...prev, fileMsg]);
+  const handleFile = async (file: File) => {
+  const attachment: FileAttachment = { id: Date.now(), name: file.name, type: file.name.split(".").pop()?.toUpperCase() || "FILE", size: `${(file.size / 1024 / 1024).toFixed(1)} Mo`, progress: 40, status: "uploading" };
+  const fileMsg: ChatMessage = { id: Date.now() + 1, role: "file", text: "", time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }), file: attachment };
+  setMessages(prev => [...prev, fileMsg]);
 
-    // Simulate progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 20;
-      setMessages(prev => prev.map(m => m.file?.id === attachment.id ? { ...m, file: { ...m.file!, progress, status: progress < 100 ? "uploading" : "processing" } } : m));
-      if (progress >= 100) {
-        clearInterval(interval);
-        setTimeout(() => {
-          setMessages(prev => prev.map(m => m.file?.id === attachment.id ? { ...m, file: { ...m.file!, status: "traité" } } : m));
-          setPinnedFiles(prev => [...prev, { ...attachment, status: "traité" }]);
-        }, 800);
-      }
-    }, 300);
-  };
+  try {
+    const result = await uploadDocument(file);
+    const traite = result.statut === "traite";
+    setMessages(prev => prev.map(m => m.file?.id === attachment.id
+      ? { ...m, file: { ...m.file!, progress: 100, status: traite ? "traité" : "processing", documentId: result.id } }
+      : m
+    ));
+    if (traite) {
+      setPinnedFiles(prev => [...prev, { ...attachment, status: "traité", documentId: result.id }]);
+    }
+  } catch (err) {
+    console.error("Erreur upload document:", err);
+  }
+};
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

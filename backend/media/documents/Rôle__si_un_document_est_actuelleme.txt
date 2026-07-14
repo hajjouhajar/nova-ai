@@ -1,0 +1,1 @@
+Rôle : si un document est actuellement épinglé (pinnedFiles), la question passe par analyzeDocument() (le RAG, avec recherche de similarité) au lieu du chat général — exactement le comportement décrit dans ton cahier des charges (section 3.5 : "Bouton Analyser → questions sur le contenu d'un document précis").

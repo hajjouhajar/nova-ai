@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { login, register } from "./api/auth";
-import { saveLearningProfile, generateRoadmap } from "./api/learning";
+import { saveLearningProfile, generateRoadmap,  getRoadmap } from "./api/learning";
 import { sendChatMessage } from "./api/chat";
+
 import {
   LayoutDashboard, FolderOpen, CheckSquare, MessageSquare,
   Clock, Settings, Bell, Plus, Send, X, CheckCircle2, Circle,
@@ -2528,6 +2529,21 @@ useEffect(() => {
   if (!isAuthenticated) return;
   getTasks().then(setTasks).catch(err => console.error("Erreur chargement tâches:", err));
   getProjects().then(setProjects).catch(err => console.error("Erreur chargement projets:", err));
+  getRoadmap()
+  .then((data) => {
+    const path: LearningPath = {
+      id: data.id,
+      profile: { domain: "", niveau: "", disponibilite: "", langue: "", career: "" },
+      steps: data.steps,
+      modules: data.modules,
+    };
+    setLearningPaths([path]);
+    setActivePathId(path.id);
+  })
+  .catch(() => {
+    // Pas de roadmap existante = utilisateur pas encore passé par l'onboarding, rien à faire
+  });
+
 }, [isAuthenticated]);
   if (!isAuthenticated) {
     return (

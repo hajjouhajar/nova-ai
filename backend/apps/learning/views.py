@@ -1,4 +1,4 @@
-from rest_framework import permissions
+﻿from rest_framework import permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Roadmap
@@ -26,7 +26,7 @@ class GenerateRoadmapView(APIView):
         except AttributeError:
             return Response({"detail": "Complétez d'abord l'onboarding"}, status=400)
 
-        template = select_template(profile.objective)
+        template = select_template(profile.domain)
 
         roadmap, created = Roadmap.objects.update_or_create(
             learning_profile=profile,

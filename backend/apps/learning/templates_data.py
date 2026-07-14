@@ -1,5 +1,5 @@
-"""Templates de roadmap statiques, sélectionnés selon l'objectif de l'utilisateur.
-Sera remplacé par une génération Ollama à l'étape 5."""
+﻿'''Templates de roadmap statiques, sélectionnés selon l'objectif de l'utilisateur.
+Sera remplacé par une génération Ollama à l'étape 5.'''
 
 ROADMAP_TEMPLATES = {
     "data_science": {
@@ -56,7 +56,7 @@ ROADMAP_TEMPLATES = {
 
 
 def select_template(objective: str) -> dict:
-    """Choisit un template selon des mots-clés trouvés dans l'objectif de l'utilisateur."""
+    '''Choisit un template selon des mots-clés trouvés dans l'objectif de l'utilisateur.'''
     objective_lower = objective.lower()
     for key, template in ROADMAP_TEMPLATES.items():
         if key == "default":

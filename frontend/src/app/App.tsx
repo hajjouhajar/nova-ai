@@ -1220,6 +1220,8 @@ function Chat({ pinnedProject, onClearProject, tasks, setTasks, projects, setPro
     })
     .catch((err) => {
       console.error(err);
+      const reply: ChatMessage = { id: Date.now() + 1, role: "assistant", text: err instanceof Error ? err.message : "Une erreur est survenue.", time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) };
+      setMessages(prev => [...prev, reply]);
       setIsTyping(false);
     });
 };
@@ -1241,6 +1243,11 @@ function Chat({ pinnedProject, onClearProject, tasks, setTasks, projects, setPro
     }
   } catch (err) {
     console.error("Erreur upload document:", err);
+    setMessages(prev => prev.map(m => m.file?.id === attachment.id
+      ? { ...m, file: { ...m.file!, progress: 100, status: "erreur" } }
+      : m
+    ));
+    setMessages(prev => [...prev, { id: Date.now() + 2, role: "assistant", text: err instanceof Error ? err.message : "Le document n'a pas pu être traité.", time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) }]);
   }
 };
 
@@ -2056,6 +2063,9 @@ function Courses({ modules: initialModules }: { modules: CourseModule[] }) {
   const [examScore, setExamScore]       = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Keep the page in sync when a roadmap is regenerated without changing its id.
+  useEffect(() => { setModules(initialModules); }, [initialModules]);
+
   const selectedModule = modules.find(m => m.id === selectedModuleId);
   const selectedLesson = selectedModule?.lessons.find(l => l.id === selectedLessonId);
   const exercises      = selectedLesson?.exercises ?? [];
@@ -2635,7 +2645,7 @@ useEffect(() => {
             setShowCert={setShowCert}
           />
         )}
-        {page === "courses"   && <Courses key={activePathId ?? 0} modules={activePath?.modules ?? MOCK_MODULES} />}
+        {page === "courses"   && <Courses key={activePathId ?? 0} modules={activePath?.modules?.length ? activePath.modules : MOCK_MODULES} />}
         {page === "projects"  && (
           <Projects
             tasks={tasks} setTasks={setTasks}

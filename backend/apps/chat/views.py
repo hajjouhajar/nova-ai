@@ -1,12 +1,10 @@
-import requests
 from rest_framework import permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
+
+from apps.ai.ollama import OllamaError, generate
 from .models import ChatHistory
 from .serializers import ChatHistorySerializer
-
-OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "mistral:7b-instruct-q4_0"
 
 
 class ChatView(APIView):
@@ -22,20 +20,9 @@ class ChatView(APIView):
             return Response({"detail": "Message vide"}, status=400)
 
         try:
-            r = requests.post(OLLAMA_URL, json={
-                "model": OLLAMA_MODEL,
-                "prompt": message,
-                "stream": False,
-            }, timeout=60)
-            r.raise_for_status()
-            reponse_texte = r.json().get("response", "").strip()
-        except requests.RequestException:
-            return Response(
-                {"detail": "Ollama indisponible. Vérifiez qu'il tourne (ollama serve)."},
-                status=503
-            )
+            answer = generate(message, system="Tu es Nova, un assistant pédagogique utile. Réponds dans la langue de l'utilisateur.")
+        except OllamaError as exc:
+            return Response({"detail": str(exc)}, status=503)
 
-        chat = ChatHistory.objects.create(
-            user=request.user, message=message, reponse=reponse_texte
-        )
+        chat = ChatHistory.objects.create(user=request.user, message=message, reponse=answer)
         return Response(ChatHistorySerializer(chat).data, status=201)

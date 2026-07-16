@@ -3,6 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from pgvector.django import L2Distance
+
+from apps.ai.ollama import OllamaError, generate
 from .models import Document, DocumentChunk
 from .utils import extraire_texte, decouper_en_chunks, generer_embedding
 
@@ -16,31 +18,25 @@ class DocumentUploadView(APIView):
         if not fichier:
             return Response({"detail": "Aucun fichier envoyé"}, status=400)
 
-        extension = fichier.name.split(".")[-1].lower()
-        doc = Document.objects.create(
-            user=request.user,
-            nom_fichier=fichier.name,
-            type_fichier=extension,
-            chemin_stockage=fichier,
-        )
-
+        extension = fichier.name.rsplit(".", 1)[-1].lower() if "." in fichier.name else ""
+        if extension not in {"pdf", "docx", "txt", "md"}:
+            return Response({"detail": "Format non pris en charge : PDF, DOCX, TXT ou MD."}, status=400)
+        doc = Document.objects.create(user=request.user, nom_fichier=fichier.name, type_fichier=extension, chemin_stockage=fichier)
         try:
-            texte = extraire_texte(fichier, extension)
-            chunks = decouper_en_chunks(texte)
+            fichier.seek(0)
+            chunks = decouper_en_chunks(extraire_texte(fichier, extension))
             if not chunks:
-                doc.statut = "erreur"
-            else:
-                for i, chunk_texte in enumerate(chunks):
-                    vecteur = generer_embedding(chunk_texte)
-                    DocumentChunk.objects.create(
-                        document=doc, contenu=chunk_texte, embedding=vecteur, ordre=i
-                    )
-                doc.statut = "traite"
-        except Exception:
+                raise ValueError("Aucun texte lisible n'a été trouvé dans le document.")
+            for index, chunk in enumerate(chunks):
+                DocumentChunk.objects.create(document=doc, contenu=chunk, embedding=generer_embedding(chunk), ordre=index)
+            doc.statut = "traite"
+            doc.save(update_fields=["statut"])
+        except Exception as exc:
             doc.statut = "erreur"
-        doc.save()
-
+            doc.save(update_fields=["statut"])
+            return Response({"id": doc.id, "nom_fichier": doc.nom_fichier, "statut": doc.statut, "detail": str(exc)}, status=422)
         return Response({"id": doc.id, "nom_fichier": doc.nom_fichier, "statut": doc.statut}, status=201)
+
 
 class DocumentAnalyzeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -49,29 +45,17 @@ class DocumentAnalyzeView(APIView):
         question = request.data.get("question", "").strip()
         if not question:
             return Response({"detail": "Question vide"}, status=400)
-
-        vecteur_question = generer_embedding(question)
-
-        chunks_pertinents = (
-            DocumentChunk.objects
-            .filter(document_id=document_id, document__user=request.user)
-            .order_by(L2Distance("embedding", vecteur_question))[:3]
-        )
-
-        contexte = "\n\n".join(c.contenu for c in chunks_pertinents)
-
-        prompt = f"""Voici des extraits pertinents d'un document :
-
-{contexte}
-
-En te basant UNIQUEMENT sur ces extraits, réponds à cette question : {question}"""
-
-        import requests
-        r = requests.post("http://localhost:11434/api/generate", json={
-            "model": "mistral:7b-instruct-q4_0",
-            "prompt": prompt,
-            "stream": False,
-        }, timeout=60)
-        reponse = r.json().get("response", "").strip()
-
-        return Response({"reponse": reponse, "extraits_utilises": len(chunks_pertinents)})
+        try:
+            vector = generer_embedding(question)
+        except OllamaError as exc:
+            return Response({"detail": str(exc)}, status=503)
+        chunks = DocumentChunk.objects.filter(document_id=document_id, document__user=request.user).order_by(L2Distance("embedding", vector))[:3]
+        context = "\n\n".join(chunk.contenu for chunk in chunks)
+        if not context:
+            return Response({"detail": "Aucun contenu exploitable n'a été trouvé dans ce document."}, status=422)
+        prompt = f"Voici des extraits d'un document :\n\n{context}\n\nRéponds uniquement à partir de ces extraits. Question : {question}"
+        try:
+            answer = generate(prompt, system="Réponds uniquement à partir du contexte fourni.")
+        except OllamaError as exc:
+            return Response({"detail": str(exc)}, status=503)
+        return Response({"reponse": answer, "extraits_utilises": len(chunks)})

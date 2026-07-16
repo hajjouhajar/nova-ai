@@ -16,8 +16,10 @@ class LearningProfileView(APIView):
     def post(self, request):
         serializer = LearningProfileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
-        return Response(serializer.data, status=201)
+        profile, created = LearningProfile.objects.update_or_create(
+            user=request.user, defaults=serializer.validated_data
+        )
+        return Response(LearningProfileSerializer(profile).data, status=201 if created else 200)
 
     def get(self, request):
         try:

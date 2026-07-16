@@ -5,7 +5,8 @@ from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-fg9*mbttx)c8*1p&62)jpfkrx@vq6f-%7bszwj55v-df6^&n_x')
-DEBUG = config('DEBUG', default=True, cast=bool)
+# Accept deployment values such as "release" as False instead of preventing Django from starting.
+DEBUG = str(config('DEBUG', default='true')).strip().lower() in {'1', 'true', 'yes', 'on'}
 ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
@@ -102,3 +103,8 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# In Docker set OLLAMA_BASE_URL=http://host.docker.internal:11434 (or the Ollama service name).
+OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='http://127.0.0.1:11434')
+OLLAMA_MODEL = config('OLLAMA_MODEL', default='llama3.2')
+OLLAMA_EMBED_MODEL = config('OLLAMA_EMBED_MODEL', default='nomic-embed-text')

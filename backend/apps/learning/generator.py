@@ -1,4 +1,4 @@
-from apps.ai.ollama import OllamaError, generate_json
+from apps.ai.ollama import OllamaError, generate_json, is_available
 
 
 SYSTEM_PROMPT = "Tu es un ingénieur pédagogique. Réponds exclusivement par un objet JSON valide, sans Markdown. Les cours doivent être précis et dans la langue demandée."
@@ -27,6 +27,10 @@ def _fallback(profile):
 
 
 def generate_roadmap(profile):
+    # Vérifie si Ollama est disponible avant de tenter la génération (évite les longs timeouts)
+    if not is_available(timeout=3):
+        return _fallback(profile)
+
     prompt = f'''Crée un parcours d'apprentissage personnalisé.
 Domaine: {profile.domain}
 Niveau: {profile.niveau}
@@ -37,7 +41,7 @@ Objectif professionnel: {profile.career or "non précisé"}
 Retourne exactement un objet ayant cette structure, avec 3 à 6 étapes et un module par étape:
 {{"steps":[{{"ordre":1,"titre":"...","description":"...","duree_estimee_heures":4,"prerequis":[],"status":"non_commencé"}}],"modules":[{{"id":"mod1","titre":"...","description":"...","status":"à faire","lessons":[{{"id":"m1l1","titre":"...","duree_min":30,"status":"à faire","content":"cours détaillé dans la langue demandée","exercises":[{{"id":"m1l1e1","question":"...","type":"qcm","options":["..."],"reponse_attendue":"...","explication":"..."}}]}}]}}]}}'''
     try:
-        data = generate_json(prompt, system=SYSTEM_PROMPT)
+        data = generate_json(prompt, system=SYSTEM_PROMPT, timeout=45)
         if not isinstance(data.get("steps"), list) or not isinstance(data.get("modules"), list) or not data["modules"]:
             raise OllamaError("Structure de roadmap incomplète.")
         return data

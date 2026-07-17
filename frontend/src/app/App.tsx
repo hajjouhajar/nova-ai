@@ -411,6 +411,13 @@ function Onboarding({ firstName, onComplete }: { firstName: string; onComplete: 
   const [answers, setAnswers] = useState<string[]>(Array(5).fill(""));
   const [visible, setVisible] = useState(true);
   const [building, setBuilding] = useState(false);
+  const [buildError, setBuildError] = useState("");
+
+  useEffect(() => {
+    const handler = (e: Event) => setBuildError((e as CustomEvent).detail);
+    window.addEventListener("onboarding-error", handler);
+    return () => window.removeEventListener("onboarding-error", handler);
+  }, []);
 
   const stepData   = ONBOARDING_STEPS[step];
   const selected   = answers[step];
@@ -426,6 +433,7 @@ function Onboarding({ firstName, onComplete }: { firstName: string; onComplete: 
       transition(() => setStep(s => s + 1));
     } else {
       setBuilding(true);
+      setBuildError("");
       setTimeout(() => onComplete({ domain: answers[0], niveau: answers[1], disponibilite: answers[2], langue: answers[3], career: answers[4] }), 2500);
     }
   };
@@ -441,10 +449,23 @@ function Onboarding({ firstName, onComplete }: { firstName: string; onComplete: 
   if (building) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 60%, #F0F4FF 100%)" }}>
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-foreground font-medium">Thanks {firstName}, building your personalized path…</p>
-          <p className="text-sm text-muted-foreground">This will just take a moment.</p>
+        <div className="text-center space-y-4 max-w-sm px-4">
+          {buildError ? (
+            <>
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+                <AlertTriangle size={24} className="text-amber-500" />
+              </div>
+              <p className="text-foreground font-medium">Génération du parcours impossible</p>
+              <p className="text-sm text-muted-foreground">{buildError}</p>
+              <p className="text-xs text-muted-foreground">Un parcours par défaut a été créé. Vous pourrez le régénérer depuis la page Roadmap.</p>
+            </>
+          ) : (
+            <>
+              <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-foreground font-medium">Merci {firstName}, construction de votre parcours…</p>
+              <p className="text-sm text-muted-foreground">Cela peut prendre jusqu'à une minute.</p>
+            </>
+          )}
         </div>
       </div>
     );
@@ -2580,7 +2601,11 @@ useEffect(() => {
         onComplete={async (p) => {
           try {
             await saveLearningProfile(p);
-            const roadmapData = await generateRoadmap();
+            // Timeout frontend de 120s pour éviter un spinner infini
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("La génération du parcours a pris trop de temps. Un parcours de base a été créé.")), 120_000)
+            );
+            const roadmapData = await Promise.race([generateRoadmap(), timeoutPromise]);
             const newPath: LearningPath = {
               id: Date.now(),
               profile: p,
@@ -2589,11 +2614,17 @@ useEffect(() => {
             };
             setLearningPaths([newPath]);
             setActivePathId(newPath.id);
-          } catch (err) {
-            console.error("Erreur génération roadmap:", err);
-          } finally {
             setNeedsOnboarding(false);
-            setPage("roadmap");
+            setPage("dashboard");
+          } catch (err: any) {
+            console.error("Erreur génération roadmap:", err);
+            // Affiche l'erreur dans le spinner pendant 3s puis redirige quand même
+            const onboardingEvent = new CustomEvent("onboarding-error", { detail: err.message || "Erreur inconnue" });
+            window.dispatchEvent(onboardingEvent);
+            setTimeout(() => {
+              setNeedsOnboarding(false);
+              setPage("dashboard");
+            }, 3000);
           }
         }}
       />
